@@ -1,0 +1,200 @@
+{
+  "pairings": [
+    {
+      "date": "2024-01-15",
+      "pairs": [
+        [
+          "Alice Johnson",
+          "Bob Chen"
+        ],
+        [
+          "Carol Davis",
+          "David Kim"
+        ],
+        [
+          "Emma Wilson",
+          "Frank Rodriguez"
+        ],
+        [
+          "Grace Lee",
+          "Henry Thompson"
+        ],
+        [
+          "Isabella Garcia",
+          "James Anderson"
+        ],
+        [
+          "Kate Miller",
+          "Liam Brown"
+        ]
+      ],
+      "single": "Maya Patel"
+    },
+    {
+      "date": "2024-01-29",
+      "pairs": [
+        [
+          "Alice Johnson",
+          "David Kim"
+        ],
+        [
+          "Bob Chen",
+          "Emma Wilson"
+        ],
+        [
+          "Carol Davis",
+          "Maya Patel"
+        ],
+        [
+          "Frank Rodriguez",
+          "Isabella Garcia"
+        ],
+        [
+          "Grace Lee",
+          "James Anderson"
+        ],
+        [
+          "Henry Thompson",
+          "Kate Miller"
+        ]
+      ],
+      "single": "Liam Brown"
+    },
+    {
+      "date": "2024-02-12",
+      "pairs": [
+        [
+          "Alice Johnson",
+          "Frank Rodriguez"
+        ],
+        [
+          "Bob Chen",
+          "Grace Lee"
+        ],
+        [
+          "Carol Davis",
+          "Liam Brown"
+        ],
+        [
+          "David Kim",
+          "Emma Wilson"
+        ],
+        [
+          "Henry Thompson",
+          "Isabella Garcia"
+        ],
+        [
+          "James Anderson",
+          "Kate Miller"
+        ],
+        [
+          "Maya Patel",
+          "Noah Williams"
+        ]
+      ],
+      "single": null
+    },
+    {
+      "date": "2024-02-26",
+      "pairs": [
+        [
+          "Alice Johnson",
+          "Henry Thompson"
+        ],
+        [
+          "Bob Chen",
+          "Maya Patel"
+        ],
+        [
+          "Carol Davis",
+          "James Anderson"
+        ],
+        [
+          "David Kim",
+          "Grace Lee"
+        ],
+        [
+          "Emma Wilson",
+          "Liam Brown"
+        ],
+        [
+          "Frank Rodriguez",
+          "Kate Miller"
+        ],
+        [
+          "Isabella Garcia",
+          "Noah Williams"
+        ],
+        [
+          "Oliver Martinez",
+          "Sophia Taylor"
+        ]
+      ],
+      "single": null
+    },
+    {
+      "date": "2024-03-11",
+      "pairs": [
+        [
+          "Alice Johnson",
+          "Isabella Garcia"
+        ],
+        [
+          "Bob Chen",
+          "Kate Miller"
+        ],
+        [
+          "Carol Davis",
+          "Noah Williams"
+        ],
+        [
+          "David Kim",
+          "Liam Brown"
+        ],
+        [
+          "Emma Wilson",
+          "Oliver Martinez"
+        ],
+        [
+          "Frank Rodriguez",
+          "Maya Patel"
+        ],
+        [
+          "Grace Lee",
+          "Sophia Taylor"
+        ]
+      ],
+      "single": "James Anderson"
+    },
+    {
+      "date": "2024-03-25",
+      "pairs": [
+        [
+          "Alice Johnson",
+          "James Anderson"
+        ],
+        [
+          "Bob Chen",
+          "Oliver Martinez"
+        ],
+        [
+          "Carol Davis",
+          "Sophia Taylor"
+        ],
+        [
+          "David Kim",
+          "Frank Rodriguez"
+        ],
+        [
+          "Emma Wilson",
+          "Henry Thompson"
+        ],
+        [
+          "Grace Lee",
+          "Liam Brown"
+        ],
+        [
+          "Isabella Garcia",
+          "Kate Miller"
+        ],
+     
