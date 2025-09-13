@@ -303,7 +303,7 @@ def get_status_info():
         
         signup_status = f"Signup message posted on {message_info.get('posted_date', 'unknown date')}"
         
-        # Get current participants
+        # Get current participants using ANY emoji reaction
         try:
             reactions = app.client.reactions_get(
                 channel=message_info['channel'],
@@ -311,10 +311,10 @@ def get_status_info():
             )
             
             if 'message' in reactions and 'reactions' in reactions['message']:
+                participants = set()  # Use set to avoid duplicates
                 for reaction in reactions['message']['reactions']:
-                    if reaction['name'] == 'coffee':
-                        participant_count = len(reaction['users'])
-                        break
+                    participants.update(reaction['users'])  # Any emoji
+                participant_count = len(participants)  # Convert to count
         except Exception:
             pass
             
@@ -331,11 +331,12 @@ def get_status_info():
         pairing_status = f"Pairings generated: {pair_count} pairs {single}"
     
     return f"*Coffee Chat Status for {today}*\n\n" \
-           f"📝 {signup_status}\n" \
+           f"📍 {signup_status}\n" \
            f"👥 Current participants: {participant_count}\n" \
            f"☕ {pairing_status}\n\n" \
            f"Is pairing week: {'Yes' if is_pairing_week() else 'No'}\n\n" \
-           f"🔧 *Using improved weighted penalty scoring system*"
+           f"🔧 *Using improved weighted penalty scoring system*\n" \
+           f"🎯 *Accepts ANY emoji reactions for signup*"
 
 
 # INTERNAL FUNCTIONS (called by both slash commands and scheduled events)
@@ -355,7 +356,7 @@ def post_signup_message_internal():
         except s3.exceptions.NoSuchKey:
             pass
         
-        # Post the signup message
+        # Post the signup message (simple coffee emoji instruction, but backend accepts any emoji)
         result = app.client.chat_postMessage(
             channel=channel,
             text="☕ Coffee Chat Signups - React to this message!",
@@ -389,7 +390,7 @@ def post_signup_message_internal():
 
 
 def run_pairing_internal():
-    """Internal function to run pairing algorithm"""
+    """Internal function to run pairing algorithm - FIXED VERSION"""
     channel = os.environ.get('SLACK_CHANNEL', 'virtual-coffee')
     today = datetime.date.today().strftime("%Y-%m-%d")
     
@@ -410,12 +411,13 @@ def run_pairing_internal():
             timestamp=message_info['ts']
         )
         
-        # Find the coffee emoji reactions
-        participants = []
+        # Get participants from ANY emoji reactions
+        participants = set()
         if 'message' in reactions and 'reactions' in reactions['message']:
             for reaction in reactions['message']['reactions']:
-                if reaction['name'] == 'coffee':
-                    participants.extend(reaction['users'])
+                participants.update(reaction['users'])  # Any emoji
+        
+        participants = list(participants)  # Convert back to list
         
         if not participants:
             app.client.chat_postMessage(
@@ -424,31 +426,65 @@ def run_pairing_internal():
             )
             return 'No participants found - posted notification'
         
-        # Get user display names
-        user_info = {}
+        # CRITICAL FIX: Get user display names BEFORE generating pairings
+        user_info = {}  # Maps user_id -> display_name
+        participant_names = []  # List of display names for pairing algorithm
+        
         for user_id in participants:
             try:
                 user = app.client.users_info(user=user_id)
-                user_info[user_id] = user['user']['profile'].get('display_name') or user['user']['real_name']
+                display_name = user['user']['profile'].get('display_name') or user['user']['real_name']
+                user_info[user_id] = display_name
+                participant_names.append(display_name)  # Use display names for pairing
             except:
+                # Fallback to user_id if API fails
                 user_info[user_id] = user_id
+                participant_names.append(user_id)
         
-        # Generate pairings using improved algorithm
-        print(f"Generating pairings for {len(participants)} participants using weighted penalty system")
-        pairs, single = bot.generate_pairings(participants)
+        # Generate pairings using DISPLAY NAMES (not user IDs) for consistency with history
+        print(f"Generating pairings for {len(participant_names)} participants using weighted penalty system")
+        print(f"Participants (display names): {participant_names}")
         
-        # Update history with display names
-        last_pairing = bot.history["pairings"][-1]
-        pairs_with_names = []
-        for pair in last_pairing["pairs"]:
-            pairs_with_names.append([user_info.get(pair[0], pair[0]), user_info.get(pair[1], pair[1])])
-        last_pairing["pairs"] = pairs_with_names
-        if last_pairing.get("single"):
-            last_pairing["single"] = user_info.get(last_pairing["single"], last_pairing["single"])
-        bot.save_history()
+        # The bot's generate_pairings method will now work with display names
+        # This ensures calculate_pairing_score can properly check history
+        pairs_names, single_name = bot.generate_pairings(participant_names)
         
-        # Format and post results
-        output = bot.format_output(pairs, single)
+        # Now convert the paired display names back to user IDs for Slack mentions
+        pairs_ids = []
+        for pair_names in pairs_names:
+            pair_ids = []
+            for name in pair_names:
+                # Find the user_id that corresponds to this display name
+                for uid, uname in user_info.items():
+                    if uname == name:
+                        pair_ids.append(uid)
+                        break
+            if len(pair_ids) == 2:  # Only add if we found both IDs
+                pairs_ids.append(pair_ids)
+            else:
+                print(f"Warning: Could not find user IDs for pair: {pair_names}")
+        
+        # Convert single person name back to ID for mention
+        single_id = None
+        if single_name:
+            for uid, uname in user_info.items():
+                if uname == single_name:
+                    single_id = uid
+                    break
+        
+        # Format output using user IDs for proper Slack mentions
+        output = f"*Coffee Pairings for {today}*\n"
+        output += "=" * 40 + "\n\n"
+        
+        for i, pair in enumerate(pairs_ids, 1):
+            output += f"*Pair {i}:* <@{pair[0]}> and <@{pair[1]}>\n"
+        
+        if single_id:
+            output += "\n" + "=" * 40 + "\n"
+            output += f"⭐ <@{single_id}> is without a partner this week.\n"
+            output += "Please consider inviting them to join your coffee chat!\n"
+        
+        # Post results
         app.client.chat_postMessage(
             channel=channel,
             text="☕ Coffee pairings are here!",
@@ -463,7 +499,7 @@ def run_pairing_internal():
             ]
         )
         
-        return f'Pairings generated successfully: {len(pairs)} pairs (using improved scoring system)'
+        return f'Pairings generated successfully: {len(pairs_ids)} pairs (using improved scoring system with any emoji support)'
         
     except Exception as e:
         raise Exception(f"Error running pairing: {str(e)}")
@@ -640,5 +676,5 @@ def lambda_handler(event, context):
     # Default behavior for testing
     return {
         'statusCode': 200,
-        'body': json.dumps('Coffee bot is running with improved weighted penalty scoring!')
+        'body': json.dumps('Coffee bot is running with improved weighted penalty scoring and any emoji support!')
     }
