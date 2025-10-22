@@ -29,6 +29,8 @@ class CoffeePairingBot:
         # Use test history file if in test mode
         self.history_key = 'test_history.json' if os.environ.get('TEST_MODE') == 'true' else HISTORY_KEY
         self.history = self.load_history()
+        # Initialize badges if they don't exist
+        self.initialize_badges()
     
     def load_history(self):
         """Load pairing history from S3"""
@@ -47,7 +49,92 @@ class CoffeePairingBot:
             Body=json.dumps(self.history, indent=2),
             ContentType='application/json'
         )
-    
+
+    def get_badge_level(self, participation_count):
+        """Determine badge level based on participation count"""
+        if participation_count >= 16:
+            return "Coffee Legend"
+        elif participation_count >= 12:
+            return "Coffee Veteran"
+        elif participation_count >= 8:
+            return "Coffee Enthusiast"
+        elif participation_count >= 4:
+            return "Regular"
+        elif participation_count >= 2:
+            return "Coffee Newbie"
+        else:
+            return "First Timer"
+
+    def calculate_participation_counts(self):
+        """Calculate total participation counts for all people from history"""
+        participation_counts = {}
+        for pairing in self.history["pairings"]:
+            # Count people in pairs
+            for pair in pairing["pairs"]:
+                for person in pair:
+                    participation_counts[person] = participation_counts.get(person, 0) + 1
+            # Count single person if exists
+            if pairing.get("single"):
+                person = pairing["single"]
+                participation_counts[person] = participation_counts.get(person, 0) + 1
+        return participation_counts
+
+    def initialize_badges(self):
+        """Initialize badge system if it doesn't exist, calculating from all historical data"""
+        if "badges" not in self.history:
+            print("Initializing badge system from historical data...")
+            self.history["badges"] = {}
+
+            # Calculate participation counts from entire history
+            participation_counts = self.calculate_participation_counts()
+
+            # Set initial badge levels for everyone
+            for person, count in participation_counts.items():
+                badge_level = self.get_badge_level(count)
+                self.history["badges"][person] = {
+                    "level": badge_level,
+                    "total_participations": count
+                }
+                print(f"Initialized {person}: {badge_level} ({count} participations)")
+
+            # Save the initialized badges
+            self.save_history()
+            print(f"Badge system initialized with {len(self.history['badges'])} participants")
+
+    def update_badges(self, current_participants):
+        """Update badge counts and detect level-ups for current participants"""
+        levelups = []
+
+        for person in current_participants:
+            # Get current badge info or initialize new participant
+            if person not in self.history["badges"]:
+                old_count = 0
+                old_level = None
+            else:
+                old_count = self.history["badges"][person]["total_participations"]
+                old_level = self.history["badges"][person]["level"]
+
+            # Increment participation count
+            new_count = old_count + 1
+            new_level = self.get_badge_level(new_count)
+
+            # Update badge data
+            self.history["badges"][person] = {
+                "level": new_level,
+                "total_participations": new_count
+            }
+
+            # Detect level-up (or first badge)
+            if old_level != new_level:
+                levelups.append({
+                    "person": person,
+                    "new_level": new_level,
+                    "count": new_count
+                })
+                print(f"Badge level-up: {person} -> {new_level} ({new_count} chats)")
+
+        return levelups
+
     def calculate_pairing_score(self, person1, person2):
         """
         Calculate a weighted penalty score for pairing two people.
@@ -103,9 +190,12 @@ class CoffeePairingBot:
         return "0000-00-00"  # Never been single
     
     def generate_pairings(self, participants):
-        """Generate coffee pairings using weighted penalty scoring system"""
+        """Generate coffee pairings using weighted penalty scoring system with veteran-newcomer preference"""
+        # Update badges and detect level-ups BEFORE pairing (using original participation counts)
+        levelups = self.update_badges(participants)
+
         random.shuffle(participants)  # Shuffle for initial randomness
-        
+
         # Handle odd number of participants
         single_person = None
         if len(participants) % 2 != 0:
@@ -114,25 +204,64 @@ class CoffeePairingBot:
             single_candidates.sort(key=self.get_last_single_date)
             single_person = single_candidates[0]
             participants.remove(single_person)
-        
-        # Create best possible pairings using weighted scoring
+
+        # Identify newcomers (3 or fewer participations) and veterans (8+ participations)
+        newcomers = []
+        veterans = []
+        for person in participants:
+            if person in self.history["badges"]:
+                count = self.history["badges"][person]["total_participations"]
+                if count <= 3:
+                    newcomers.append(person)
+                elif count >= 8:
+                    veterans.append(person)
+
+        print(f"Identified {len(newcomers)} newcomers and {len(veterans)} veterans")
+
+        # Create best possible pairings using weighted scoring with veteran-newcomer preference
         pairs = []
         unpaired = participants.copy()
-        
+
+        # SOFT PREFERENCE: Try to pair newcomers with veterans first (if score is acceptable)
+        for newcomer in newcomers[:]:  # Use slice to iterate over copy
+            if newcomer not in unpaired:
+                continue  # Already paired
+
+            best_veteran = None
+            best_score = -1
+
+            # Find the best veteran pairing for this newcomer
+            for veteran in veterans:
+                if veteran not in unpaired:
+                    continue  # Already paired
+
+                score = self.calculate_pairing_score(newcomer, veteran)
+                if score > best_score:
+                    best_score = score
+                    best_veteran = veteran
+
+            # Only commit veteran-newcomer pair if score is acceptable (> 10)
+            if best_veteran and best_score > 10:
+                pairs.append([newcomer, best_veteran])
+                unpaired.remove(newcomer)
+                unpaired.remove(best_veteran)
+                print(f"Veteran-newcomer pair: {newcomer} + {best_veteran} (score: {best_score})")
+
+        # Continue with normal algorithm for remaining people
         while len(unpaired) >= 2:
             best_pair = None
             best_score = -1  # Initialize with impossible score
-            
+
             # Try all possible pairings and find the one with highest score
             for i in range(len(unpaired)):
                 for j in range(i+1, len(unpaired)):
                     p1, p2 = unpaired[i], unpaired[j]
                     score = self.calculate_pairing_score(p1, p2)
-                    
+
                     if score > best_score:
                         best_pair = [p1, p2]
                         best_score = score
-            
+
             if best_pair:
                 pairs.append(best_pair)
                 unpaired.remove(best_pair[0])
@@ -144,7 +273,7 @@ class CoffeePairingBot:
                 unpaired.remove(unpaired[0])
                 unpaired.remove(unpaired[0])
                 print(f"Fallback pairing used")
-        
+
         # Save this week's pairings to history
         self.history["pairings"].append({
             "date": self.today,
@@ -152,23 +281,32 @@ class CoffeePairingBot:
             "single": single_person
         })
         self.save_history()
-        
-        return pairs, single_person
+
+        return pairs, single_person, levelups
     
-    def format_output(self, pairs, single_person):
-        """Format the pairings for Slack message"""
+    def format_output(self, pairs, single_person, levelups):
+        """Format the pairings for Slack message with badge updates"""
         output = f"*Coffee Pairings for {self.today}*\n"
         output += "=" * 40 + "\n\n"
-        
+
         for i, pair in enumerate(pairs, 1):
             # Using <@user_id> format for proper Slack mentions
             output += f"*Pair {i}:* <@{pair[0]}> and <@{pair[1]}>\n"
-        
+
         if single_person:
             output += "\n" + "=" * 40 + "\n"
             output += f"⭐ <@{single_person}> is without a partner this week.\n"
             output += "Please consider inviting them to join your coffee chat!\n"
-        
+
+        # Add badge updates section if anyone leveled up
+        if levelups:
+            output += "\n" + "=" * 40 + "\n"
+            output += "🏆 *Badge Updates:* "
+            badge_messages = []
+            for levelup in levelups:
+                badge_messages.append(f"<@{levelup['person']}> earned {levelup['new_level']} ({levelup['count']} chats)!")
+            output += " ".join(badge_messages)
+
         return output
 
 
@@ -190,6 +328,7 @@ def handle_coffee_admin_command(ack, respond, command):
                    "`/coffee-admin post-signup` - Post a new signup message\n"
                    "`/coffee-admin pair-now` - Run pairing algorithm immediately\n"
                    "`/coffee-admin status` - Show current signup status\n"
+                   "`/coffee-admin badges` - Show badge levels for all participants\n"
                    "`/coffee-admin delete-test` - Delete today's test messages\n"
                    "`/coffee-admin test-scoring` - Test the new scoring system"
         })
@@ -232,7 +371,20 @@ def handle_coffee_admin_command(ack, respond, command):
                 "response_type": "ephemeral",
                 "text": f"❌ Error getting status: {str(e)}"
             })
-    
+
+    elif cmd == 'badges':
+        try:
+            badges_info = get_badges_info()
+            respond({
+                "response_type": "ephemeral",
+                "text": badges_info
+            })
+        except Exception as e:
+            respond({
+                "response_type": "ephemeral",
+                "text": f"❌ Error getting badges: {str(e)}"
+            })
+
     elif cmd == 'delete-test':
         try:
             result = delete_test_messages_internal()
@@ -291,25 +443,25 @@ def get_status_info():
     """Get current status of signups and pairings"""
     channel = os.environ.get('SLACK_CHANNEL', 'virtual-coffee')
     today = datetime.date.today().strftime("%Y-%m-%d")
-    
+
     # Check if signup message exists
     signup_status = "No signup message posted"
     participant_count = 0
-    
+
     try:
         message_key = 'test_signup_message.json' if os.environ.get('TEST_MODE') == 'true' else 'latest_signup_message.json'
         response = s3.get_object(Bucket=BUCKET_NAME, Key=message_key)
         message_info = json.loads(response['Body'].read().decode('utf-8'))
-        
+
         signup_status = f"Signup message posted on {message_info.get('posted_date', 'unknown date')}"
-        
+
         # Get current participants using ANY emoji reaction
         try:
             reactions = app.client.reactions_get(
                 channel=message_info['channel'],
                 timestamp=message_info['ts']
             )
-            
+
             if 'message' in reactions and 'reactions' in reactions['message']:
                 participants = set()  # Use set to avoid duplicates
                 for reaction in reactions['message']['reactions']:
@@ -317,10 +469,10 @@ def get_status_info():
                 participant_count = len(participants)  # Convert to count
         except Exception:
             pass
-            
+
     except Exception:
         pass
-    
+
     # Check if pairings were run today
     bot = CoffeePairingBot()
     pairing_status = "No pairings generated today"
@@ -329,14 +481,69 @@ def get_status_info():
         pair_count = len(last_pairing["pairs"])
         single = "with 1 person without a partner" if last_pairing.get("single") else "with everyone paired"
         pairing_status = f"Pairings generated: {pair_count} pairs {single}"
-    
+
+    # Calculate badge distribution
+    badge_distribution = {}
+    if "badges" in bot.history:
+        for person, data in bot.history["badges"].items():
+            level = data["level"]
+            badge_distribution[level] = badge_distribution.get(level, 0) + 1
+
+    badge_stats = ", ".join([f"{count} {level}" for level, count in sorted(badge_distribution.items(),
+                                                                             key=lambda x: ["First Timer", "Coffee Newbie", "Regular", "Coffee Enthusiast", "Coffee Veteran", "Coffee Legend"].index(x[0]),
+                                                                             reverse=True)])
+
     return f"*Coffee Chat Status for {today}*\n\n" \
            f"📍 {signup_status}\n" \
            f"👥 Current participants: {participant_count}\n" \
            f"☕ {pairing_status}\n\n" \
+           f"🏆 Badge distribution: {badge_stats if badge_stats else 'No badges yet'}\n\n" \
            f"Is pairing week: {'Yes' if is_pairing_week() else 'No'}\n\n" \
-           f"🔧 *Using improved weighted penalty scoring system*\n" \
+           f"🔧 *Using weighted penalty scoring with veteran-newcomer preference*\n" \
            f"🎯 *Accepts ANY emoji reactions for signup*"
+
+
+def get_badges_info():
+    """Get detailed badge information for all participants"""
+    bot = CoffeePairingBot()
+
+    if "badges" not in bot.history or not bot.history["badges"]:
+        return "*No badge data available yet.*"
+
+    # Group people by badge level
+    badge_groups = {
+        "Coffee Legend": [],
+        "Coffee Veteran": [],
+        "Coffee Enthusiast": [],
+        "Regular": [],
+        "Coffee Newbie": [],
+        "First Timer": []
+    }
+
+    for person, data in bot.history["badges"].items():
+        level = data["level"]
+        count = data["total_participations"]
+        badge_groups[level].append((person, count))
+
+    # Sort each group by participation count (descending)
+    for level in badge_groups:
+        badge_groups[level].sort(key=lambda x: x[1], reverse=True)
+
+    # Format output
+    output = "*🏆 Badge Levels - All Participants*\n\n"
+
+    for level in ["Coffee Legend", "Coffee Veteran", "Coffee Enthusiast", "Regular", "Coffee Newbie", "First Timer"]:
+        people = badge_groups[level]
+        if people:
+            output += f"*{level}* ({len(people)})\n"
+            for person, count in people:
+                output += f"  • {person}: {count} chats\n"
+            output += "\n"
+
+    total_participants = sum(len(people) for people in badge_groups.values())
+    output += f"_Total: {total_participants} participants_"
+
+    return output
 
 
 # INTERNAL FUNCTIONS (called by both slash commands and scheduled events)
@@ -356,16 +563,16 @@ def post_signup_message_internal():
         except s3.exceptions.NoSuchKey:
             pass
         
-        # Post the signup message (simple coffee emoji instruction, but backend accepts any emoji)
+        # Post the signup message (backend accepts any emoji)
         result = app.client.chat_postMessage(
             channel=channel,
-            text="☕ Coffee Chat Signups - React to this message!",
+            text="☕ Coffee Chat Signups - React to Join!",
             blocks=[
                 {
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "🎯 *Coffee Chat Signups*\n<!here>\nAdd a ☕ reaction to this message by noon Wednesday to be paired for this week's coffee chats!"
+                        "text": "☕ *Coffee Chat Signups - React to Join!*\n\nQuick coffee chats with random colleagues. 15-20 minutes. You pick when.\n\nFun fact: Participants report coffee tastes 87% better when shared with a colleague you've never met.\n\nReact with any emoji by Wednesday noon to be paired!"
                     }
                 }
             ]
@@ -444,10 +651,10 @@ def run_pairing_internal():
         # Generate pairings using DISPLAY NAMES (not user IDs) for consistency with history
         print(f"Generating pairings for {len(participant_names)} participants using weighted penalty system")
         print(f"Participants (display names): {participant_names}")
-        
+
         # The bot's generate_pairings method will now work with display names
         # This ensures calculate_pairing_score can properly check history
-        pairs_names, single_name = bot.generate_pairings(participant_names)
+        pairs_names, single_name, levelups = bot.generate_pairings(participant_names)
         
         # Now convert the paired display names back to user IDs for Slack mentions
         pairs_ids = []
@@ -471,18 +678,39 @@ def run_pairing_internal():
                 if uname == single_name:
                     single_id = uid
                     break
-        
+
+        # Convert levelup names back to IDs for mentions
+        levelups_with_ids = []
+        for levelup in levelups:
+            for uid, uname in user_info.items():
+                if uname == levelup['person']:
+                    levelups_with_ids.append({
+                        'person': uid,  # Use user ID for mention
+                        'new_level': levelup['new_level'],
+                        'count': levelup['count']
+                    })
+                    break
+
         # Format output using user IDs for proper Slack mentions
         output = f"*Coffee Pairings for {today}*\n"
         output += "=" * 40 + "\n\n"
-        
+
         for i, pair in enumerate(pairs_ids, 1):
             output += f"*Pair {i}:* <@{pair[0]}> and <@{pair[1]}>\n"
-        
+
         if single_id:
             output += "\n" + "=" * 40 + "\n"
             output += f"⭐ <@{single_id}> is without a partner this week.\n"
             output += "Please consider inviting them to join your coffee chat!\n"
+
+        # Add badge updates section if anyone leveled up
+        if levelups_with_ids:
+            output += "\n" + "=" * 40 + "\n"
+            output += "🏆 *Badge Updates:* "
+            badge_messages = []
+            for levelup in levelups_with_ids:
+                badge_messages.append(f"<@{levelup['person']}> earned {levelup['new_level']} ({levelup['count']} chats)!")
+            output += " ".join(badge_messages)
         
         # Post results
         app.client.chat_postMessage(
