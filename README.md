@@ -5,12 +5,14 @@ An intelligent Slack bot that automatically pairs colleagues for coffee chats, f
 ## 🌟 Features
 
 - **Smart Pairing Algorithm**: Prioritizes new connections and avoids recent repeats using weighted penalty scoring
+- **Badge System**: Track participation milestones with 6 badge levels (☕ → 🥉 → 🥈 → ⭐ → 🏅 → 🏆)
+- **Veteran-Newcomer Pairing**: Intelligently pairs newcomers with experienced participants when possible
 - **Slack Integration**: Seamless signup via emoji reactions and slash commands
 - **Automated Scheduling**: Posts signup messages and generates pairings automatically
 - **Historical Awareness**: Considers all past pairings to optimize future matches
 - **Admin Controls**: Full control via slash commands for testing and management
 - **Flexible Participation**: Handles odd numbers of participants gracefully
-- **Data Persistence**: Stores pairing history and preferences in Amazon S3
+- **Data Persistence**: Stores pairing history and badges in Amazon S3
 
 ## 🏗️ Architecture
 
@@ -102,16 +104,18 @@ All admin functionality is available through the `/coffee-admin` slash command:
 - `/coffee-admin help` - Show available commands
 - `/coffee-admin post-signup` - Post a signup message
 - `/coffee-admin pair-now` - Generate pairings immediately
-- `/coffee-admin status` - Show current signup status
+- `/coffee-admin status` - Show current signup status and badge distribution
+- `/coffee-admin badges` - View badge levels for all participants
 - `/coffee-admin delete-test` - Delete today's test messages
 - `/coffee-admin test-scoring` - Test the scoring system
 
 ### User Workflow
 
-1. **Signup**: Users react with ☕ emoji to signup messages
-2. **Automatic Pairing**: System generates optimal pairings
-3. **Notification**: Results posted to Slack with @mentions
+1. **Signup**: Users react with any emoji to signup messages
+2. **Automatic Pairing**: System generates optimal pairings with veteran-newcomer preference
+3. **Notification**: Results posted to Slack with @mentions and badge level-ups
 4. **Coffee Chat**: Participants arrange their 30-minute chat
+5. **Badge Progress**: Earn badges as you participate (First Timer → Coffee Newbie → Regular → Coffee Enthusiast → Coffee Veteran → Coffee Legend)
 
 ## ⚙️ Configuration
 
@@ -128,14 +132,28 @@ All admin functionality is available through the `/coffee-admin` slash command:
 
 ### Pairing Algorithm
 
-The bot uses a **weighted penalty scoring system**:
+The bot uses a **weighted penalty scoring system** with veteran-newcomer preference:
 
+**Scoring System:**
 - **Never paired**: 100 points (highest priority)
 - **6+ months ago**: 50 points
 - **3-6 months ago**: 20 points
 - **1-3 months ago**: 5 points
 - **Recent pairings**: 0 points (avoided)
 - **Repeat penalty**: -10 points per previous pairing
+
+**Veteran-Newcomer Pairing:**
+- Newcomers (≤3 participations) are preferentially paired with veterans (≥8 participations)
+- Only applied when pairing score > 10 to maintain repeat avoidance priority
+- Helps onboard new participants with experienced coffee chatters
+
+**Badge Levels:**
+- ☕ **First Timer** (1 participation)
+- 🥉 **Coffee Newbie** (2-3 participations)
+- 🥈 **Regular** (4-7 participations)
+- ⭐ **Coffee Enthusiast** (8-11 participations)
+- 🏅 **Coffee Veteran** (12-15 participations)
+- 🏆 **Coffee Legend** (16+ participations)
 
 ## 🔄 CI/CD Setup
 
@@ -252,9 +270,21 @@ Monitor Lambda execution through CloudWatch:
       ],
       "single": "User5"
     }
-  ]
+  ],
+  "badges": {
+    "User1": {
+      "level": "Coffee Legend",
+      "total_participations": 16
+    },
+    "User2": {
+      "level": "Coffee Enthusiast",
+      "total_participations": 10
+    }
+  }
 }
 ```
+
+The badge system automatically initializes from historical pairing data on first deployment.
 
 ### Regular Maintenance
 
@@ -283,7 +313,8 @@ Monitor Lambda execution through CloudWatch:
 
 ### Debug Commands
 
-- `/coffee-admin status` - System health check
+- `/coffee-admin status` - System health check and badge distribution
+- `/coffee-admin badges` - View all participant badge levels
 - `/coffee-admin test-scoring` - Algorithm testing
 - Check CloudWatch logs for detailed execution traces
 
@@ -321,6 +352,10 @@ For issues and questions:
    - Environment details
 
 ## 🔮 Roadmap
+
+Completed features:
+- [x] Badge system for tracking participation milestones
+- [x] Veteran-newcomer pairing preference
 
 Planned features:
 - [ ] Slack interactive buttons for signup
