@@ -11,6 +11,16 @@ s3 = boto3.client('s3')
 BUCKET_NAME = os.environ.get('S3_BUCKET_NAME')
 HISTORY_KEY = 'coffee_history.json'
 
+# Badge emoji mapping
+BADGE_EMOJIS = {
+    "First Timer": "☕",
+    "Coffee Newbie": "🥉",
+    "Regular": "🥈",
+    "Coffee Enthusiast": "⭐",
+    "Coffee Veteran": "🏅",
+    "Coffee Legend": "🏆"
+}
+
 # Initialize Slack app
 app = App(
     token=os.environ.get("SLACK_BOT_TOKEN"),
@@ -298,13 +308,14 @@ class CoffeePairingBot:
             output += f"⭐ <@{single_person}> is without a partner this week.\n"
             output += "Please consider inviting them to join your coffee chat!\n"
 
-        # Add badge updates section if anyone leveled up
+        # Add badge updates section if anyone leveled up (no @mentions to avoid double-pinging)
         if levelups:
             output += "\n" + "=" * 40 + "\n"
-            output += "🏆 *Badge Updates:* "
+            output += "🎖️ *Badge Updates:* "
             badge_messages = []
             for levelup in levelups:
-                badge_messages.append(f"<@{levelup['person']}> earned {levelup['new_level']} ({levelup['count']} chats)!")
+                emoji = BADGE_EMOJIS.get(levelup['new_level'], '🏆')
+                badge_messages.append(f"{levelup['person']} earned {emoji} {levelup['new_level']} ({levelup['count']} chats)!")
             output += " ".join(badge_messages)
 
         return output
@@ -529,13 +540,14 @@ def get_badges_info():
     for level in badge_groups:
         badge_groups[level].sort(key=lambda x: x[1], reverse=True)
 
-    # Format output
+    # Format output with emojis
     output = "*🏆 Badge Levels - All Participants*\n\n"
 
     for level in ["Coffee Legend", "Coffee Veteran", "Coffee Enthusiast", "Regular", "Coffee Newbie", "First Timer"]:
         people = badge_groups[level]
         if people:
-            output += f"*{level}* ({len(people)})\n"
+            emoji = BADGE_EMOJIS.get(level, '🏆')
+            output += f"*{emoji} {level}* ({len(people)})\n"
             for person, count in people:
                 output += f"  • {person}: {count} chats\n"
             output += "\n"
@@ -679,19 +691,7 @@ def run_pairing_internal():
                     single_id = uid
                     break
 
-        # Convert levelup names back to IDs for mentions
-        levelups_with_ids = []
-        for levelup in levelups:
-            for uid, uname in user_info.items():
-                if uname == levelup['person']:
-                    levelups_with_ids.append({
-                        'person': uid,  # Use user ID for mention
-                        'new_level': levelup['new_level'],
-                        'count': levelup['count']
-                    })
-                    break
-
-        # Format output using user IDs for proper Slack mentions
+        # Format output using user IDs for pairings, display names for badge updates
         output = f"*Coffee Pairings for {today}*\n"
         output += "=" * 40 + "\n\n"
 
@@ -703,13 +703,14 @@ def run_pairing_internal():
             output += f"⭐ <@{single_id}> is without a partner this week.\n"
             output += "Please consider inviting them to join your coffee chat!\n"
 
-        # Add badge updates section if anyone leveled up
-        if levelups_with_ids:
+        # Add badge updates section if anyone leveled up (using display names, not IDs)
+        if levelups:
             output += "\n" + "=" * 40 + "\n"
-            output += "🏆 *Badge Updates:* "
+            output += "🎖️ *Badge Updates:* "
             badge_messages = []
-            for levelup in levelups_with_ids:
-                badge_messages.append(f"<@{levelup['person']}> earned {levelup['new_level']} ({levelup['count']} chats)!")
+            for levelup in levelups:
+                emoji = BADGE_EMOJIS.get(levelup['new_level'], '🏆')
+                badge_messages.append(f"{levelup['person']} earned {emoji} {levelup['new_level']} ({levelup['count']} chats)!")
             output += " ".join(badge_messages)
         
         # Post results
