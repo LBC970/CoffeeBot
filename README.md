@@ -155,59 +155,49 @@ The bot uses a **weighted penalty scoring system** with veteran-newcomer prefere
 - 🏅 **Coffee Veteran** (12-15 participations)
 - 🏆 **Coffee Legend** (16+ participations)
 
-## 🔄 CI/CD Setup
+**Badge Update Display:**
+When participants earn new badges, they're displayed grouped by level in descending order (Legend → Newbie):
+```
+🥉 Badge Updates:
+🏆 Coffee Legend: Alice (16 chats), Bob (16 chats)
+🥈 Regular: Carol (4 chats)
+```
 
-### GitLab CI/CD
+## 🚀 Deployment
 
-1. **Add CI/CD Variables** in GitLab:
-   - `AWS_ACCESS_KEY_ID`
-   - `AWS_SECRET_ACCESS_KEY`
-   - `AWS_DEFAULT_REGION`
+### Manual Deployment
 
-2. **Pipeline Configuration** (`.gitlab-ci.yml`):
-   ```yaml
-   stages:
-     - test
-     - deploy
-
-   test:
-     stage: test
-     image: python:3.9
-     script:
-       - pip install -r requirements.txt
-       - python -m pytest tests/
-
-   deploy:
-     stage: deploy
-     image: python:3.9
-     script:
-       - ./deploy.sh
-     only:
-       - main
-   ```
-
-### Deployment Script
-
-The `deploy.sh` script handles:
+The `scripts/deploy.sh` script handles:
 - Dependency installation
-- Code packaging
-- Lambda function updates
+- Code packaging into `deployment.zip`
+- Lambda function updates via AWS CLI
 - Environment variable management
+
+Run deployment:
+```bash
+./scripts/deploy.sh
+```
+
+Ensure you have AWS credentials configured:
+```bash
+aws configure
+# or set environment variables:
+export AWS_ACCESS_KEY_ID=your-key
+export AWS_SECRET_ACCESS_KEY=your-secret
+export AWS_DEFAULT_REGION=us-east-1
+```
 
 ## 📁 Project Structure
 
 ```
-coffee-pairing-bot/
+CoffeeBot/
 ├── src/
-│   └── lambda_function.py          # Main Lambda function
-├── tests/
-│   └── test_pairing_algorithm.py   # Unit tests
+│   └── lambda_function.py          # Main Lambda function with all bot logic
 ├── scripts/
-│   ├── deploy.sh                   # Deployment script
-│   └── setup-infrastructure.sh     # AWS setup script
-├── docs/
-│   └── api.md                      # API documentation
-├── .gitlab-ci.yml                  # CI/CD pipeline
+│   └── deploy.sh                   # Deployment script
+├── examples/
+│   ├── slack-app-manifest.json     # Slack app configuration template
+│   └── sample_coffee_history.json  # Sample data structure
 ├── requirements.txt                # Python dependencies
 ├── README.md                       # This file
 └── LICENSE                         # License information
@@ -219,8 +209,8 @@ coffee-pairing-bot/
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-org/coffee-pairing-bot.git
-   cd coffee-pairing-bot
+   git clone https://github.com/LBC970/CoffeeBot.git
+   cd CoffeeBot
    ```
 
 2. **Install dependencies**:
@@ -232,21 +222,23 @@ coffee-pairing-bot/
    ```bash
    export TEST_MODE=true
    export SLACK_BOT_TOKEN=your-test-token
-   # ... other environment variables
+   export SLACK_SIGNING_SECRET=your-signing-secret
+   export S3_BUCKET_NAME=your-test-bucket
+   export SLACK_CHANNEL=test-channel
    ```
 
-4. **Run tests**:
+4. **Test locally** (requires AWS credentials):
    ```bash
-   python -m pytest tests/
+   python src/lambda_function.py
    ```
 
 ### Adding New Features
 
 1. Create a feature branch: `git checkout -b feature/new-feature`
 2. Make your changes
-3. Add tests for new functionality
-4. Update documentation
-5. Submit a merge request
+3. Test thoroughly in TEST_MODE
+4. Update documentation as needed
+5. Submit a pull request
 
 ## 📊 Monitoring and Maintenance
 
@@ -302,9 +294,9 @@ The badge system automatically initializes from historical pairing data on first
    - Confirm request URL in Slack app
 
 2. **No participants found**:
-   - Verify emoji reaction name ("coffee")
-   - Check message timestamp in S3
-   - Confirm channel permissions
+   - Verify signup message exists and reactions are being captured
+   - Check message timestamp is correctly stored in S3
+   - Confirm bot has channel permissions and can read reactions
 
 3. **Pairing algorithm issues**:
    - Use `/coffee-admin test-scoring` to debug
@@ -324,15 +316,15 @@ We welcome contributions! Please:
 
 1. Fork the repository
 2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
+3. Test changes thoroughly in TEST_MODE
+4. Update documentation as needed
 5. Submit a pull request
 
 ### Code Standards
 
 - Follow PEP 8 for Python code style
 - Add docstrings for all functions
-- Include unit tests for new features
+- Test changes thoroughly in TEST_MODE before deploying
 - Update documentation for user-facing changes
 
 ## 📄 License
@@ -344,7 +336,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For issues and questions:
 
 1. Check the [troubleshooting section](#-troubleshooting)
-2. Search existing [GitHub Issues](https://github.com/your-org/coffee-pairing-bot/issues)
+2. Search existing [GitHub Issues](https://github.com/LBC970/CoffeeBot/issues)
 3. Create a new issue with:
    - Clear description of the problem
    - Steps to reproduce
