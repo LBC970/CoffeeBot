@@ -21,6 +21,9 @@ BADGE_EMOJIS = {
     "Coffee Legend": "🏆"
 }
 
+# Badge tier order (highest to lowest)
+BADGE_TIER_ORDER = ["Coffee Legend", "Coffee Veteran", "Coffee Enthusiast", "Regular", "Coffee Newbie", "First Timer"]
+
 # Initialize Slack app
 app = App(
     token=os.environ.get("SLACK_BOT_TOKEN"),
@@ -706,12 +709,24 @@ def run_pairing_internal():
         # Add badge updates section if anyone leveled up (using display names, not IDs)
         if levelups:
             output += "\n" + "=" * 40 + "\n"
-            output += "🎖️ *Badge Updates:* "
-            badge_messages = []
+            output += "🥉 *Badge Updates:*\n"
+
+            # Group levelups by badge level
+            badge_groups = {}
             for levelup in levelups:
-                emoji = BADGE_EMOJIS.get(levelup['new_level'], '🏆')
-                badge_messages.append(f"{levelup['person']} earned {emoji} {levelup['new_level']} ({levelup['count']} chats)!")
-            output += " ".join(badge_messages)
+                level = levelup['new_level']
+                if level not in badge_groups:
+                    badge_groups[level] = []
+                badge_groups[level].append(levelup)
+
+            # Output groups in tier order (highest to lowest)
+            for badge_level in BADGE_TIER_ORDER:
+                if badge_level in badge_groups:
+                    emoji = BADGE_EMOJIS.get(badge_level, '🏆')
+                    people_list = []
+                    for levelup in badge_groups[badge_level]:
+                        people_list.append(f"{levelup['person']} ({levelup['count']} chats)")
+                    output += f"{emoji} *{badge_level}:* {', '.join(people_list)}\n"
         
         # Post results
         app.client.chat_postMessage(
