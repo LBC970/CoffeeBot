@@ -7,7 +7,7 @@ An intelligent Slack bot that automatically pairs colleagues for coffee chats, f
 - **Smart Pairing Algorithm**: Prioritizes new connections and avoids recent repeats using weighted penalty scoring
 - **Badge System**: Track participation milestones with 6 badge levels (☕ → 🥉 → 🥈 → ⭐ → 🏅 → 🏆)
 - **Veteran-Newcomer Pairing**: Intelligently pairs newcomers with experienced participants when possible
-- **Dynamic Fun Facts**: Signup messages feature "this day in history" facts, with coffee-themed fallbacks
+- **Dynamic Fun Facts**: Signup messages feature "on this date in history" facts with conversation-starter questions
 - **Slack Integration**: Seamless signup via emoji reactions and slash commands
 - **Automated Scheduling**: Posts signup messages and generates pairings automatically
 - **Historical Awareness**: Considers all past pairings to optimize future matches
@@ -115,8 +115,25 @@ All admin functionality is available through the `/coffee-admin` slash command:
 1. **Signup**: Users react with any emoji to signup messages
 2. **Automatic Pairing**: System generates optimal pairings with veteran-newcomer preference
 3. **Notification**: Results posted to Slack with @mentions and badge level-ups
-4. **Coffee Chat**: Participants arrange their 30-minute chat
+4. **Coffee Chat**: Participants arrange their 15-20 minute chat
 5. **Badge Progress**: Earn badges as you participate (First Timer → Coffee Newbie → Regular → Coffee Enthusiast → Coffee Veteran → Coffee Legend)
+
+### Signup Message Example
+
+```
+☕ Coffee Chat Time
+
+Want to meet someone new this week? Get randomly paired
+with a colleague for a quick 15-20 min chat — you two
+pick when it works.
+
+On this date in 1969, the first ARPANET message was sent
+between UCLA and Stanford.
+What's a technology you remember being amazed by when
+you first saw it?
+
+Drop any emoji to join. Pairings go out Wednesday at noon.
+```
 
 ## ⚙️ Configuration
 

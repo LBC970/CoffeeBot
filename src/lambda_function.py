@@ -67,10 +67,10 @@ def generate_fun_fact(date: datetime.date) -> str:
 
         response = client.messages.create(
             model="claude-3-haiku-20240307",
-            max_tokens=150,
+            max_tokens=200,
             messages=[{
                 "role": "user",
-                "content": f"Give me one brief, interesting historical fact about something that happened on {date_str} (any year). Keep it fun and suitable for a workplace coffee chat signup message. One or two sentences max. Don't include the year in your response - just the fact itself."
+                "content": f"Give me one brief, interesting historical fact about something that happened on {date_str} (any year). Keep it fun and suitable for a workplace coffee chat. One or two sentences max.\n\nThen on a new line, ask a short, casual follow-up question related to the fact that two colleagues could discuss over coffee. Keep the question conversational and open-ended.\n\nStart the fact with 'On this date in [year]' and follow with the fact.\n\nExample format:\nOn this date in 1969, the first ARPANET message was sent between UCLA and Stanford.\nWhat's a technology you remember being amazed by when you first saw it?"
             }]
         )
 
@@ -631,13 +631,13 @@ def post_signup_message_internal():
         # Post the signup message (backend accepts any emoji)
         result = app.client.chat_postMessage(
             channel=channel,
-            text="☕ Coffee Chat Signups - React to Join!",
+            text="☕ Coffee Chat Time",
             blocks=[
                 {
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"☕ *Coffee Chat Signups - React to Join!*\n\nQuick coffee chats with random colleagues. 15-20 minutes. You pick when.\n\nFun fact: {fun_fact}\n\nReact with any emoji by Wednesday noon to be paired!"
+                        "text": f"☕ *Coffee Chat Time*\n\nWant to meet someone new this week? Get randomly paired with a colleague for a quick 15-20 min chat — you two pick when it works.\n\n{fun_fact}\n\nDrop any emoji to join. Pairings go out Wednesday at noon."
                     }
                 }
             ]
