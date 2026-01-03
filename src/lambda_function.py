@@ -12,6 +12,9 @@ s3 = boto3.client('s3')
 BUCKET_NAME = os.environ.get('S3_BUCKET_NAME')
 HISTORY_KEY = 'coffee_history.json'
 
+# Admin user IDs (comma-separated in env var)
+ADMIN_USER_IDS = [uid.strip() for uid in os.environ.get('ADMIN_USER_IDS', '').split(',') if uid.strip()]
+
 # Badge emoji mapping
 BADGE_EMOJIS = {
     "First Timer": "☕",
@@ -376,7 +379,16 @@ class CoffeePairingBot:
 def handle_coffee_admin_command(ack, respond, command):
     """Handle /coffee-admin slash command"""
     ack()  # Acknowledge the command
-    
+
+    # Check admin permissions
+    user_id = command.get('user_id')
+    if ADMIN_USER_IDS and user_id not in ADMIN_USER_IDS:
+        respond({
+            "response_type": "ephemeral",
+            "text": "Sorry, you don't have permission to use this command."
+        })
+        return
+
     text = command.get('text', '').strip()
     parts = text.split() if text else []
     cmd = parts[0].lower() if parts else 'help'
