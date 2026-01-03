@@ -7,6 +7,7 @@ An intelligent Slack bot that automatically pairs colleagues for coffee chats, f
 - **Smart Pairing Algorithm**: Prioritizes new connections and avoids recent repeats using weighted penalty scoring
 - **Badge System**: Track participation milestones with 6 badge levels (☕ → 🥉 → 🥈 → ⭐ → 🏅 → 🏆)
 - **Veteran-Newcomer Pairing**: Intelligently pairs newcomers with experienced participants when possible
+- **Dynamic Fun Facts**: Signup messages feature "this day in history" facts, with coffee-themed fallbacks
 - **Slack Integration**: Seamless signup via emoji reactions and slash commands
 - **Automated Scheduling**: Posts signup messages and generates pairings automatically
 - **Historical Awareness**: Considers all past pairings to optimize future matches
@@ -129,6 +130,7 @@ All admin functionality is available through the `/coffee-admin` slash command:
 | `SLACK_CHANNEL` | Channel for announcements | Yes | - |
 | `REFERENCE_DATE` | Reference date for bi-weekly scheduling | No | `2025-01-06` |
 | `TEST_MODE` | Use test data files | No | `false` |
+| `ANTHROPIC_API_KEY` | API key for dynamic fun facts | No | - |
 
 ### Pairing Algorithm
 
@@ -192,7 +194,8 @@ export AWS_DEFAULT_REGION=us-east-1
 ```
 CoffeeBot/
 ├── src/
-│   └── lambda_function.py          # Main Lambda function with all bot logic
+│   ├── lambda_function.py          # Main Lambda function with all bot logic
+│   └── fun_facts.json              # Fallback fun facts for signup messages
 ├── scripts/
 │   └── deploy.sh                   # Deployment script
 ├── examples/
@@ -348,6 +351,7 @@ For issues and questions:
 Completed features:
 - [x] Badge system for tracking participation milestones
 - [x] Veteran-newcomer pairing preference
+- [x] Dynamic fun facts in signup messages
 
 Planned features:
 - [ ] Slack interactive buttons for signup
