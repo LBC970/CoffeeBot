@@ -3,6 +3,7 @@ import os
 import random
 import datetime
 import boto3
+import anthropic
 from slack_bolt import App
 from slack_bolt.adapter.aws_lambda import SlackRequestHandler
 
@@ -34,6 +35,52 @@ app = App(
 # Initialize the Slack request handler for Lambda
 SlackRequestHandler.clear_all_log_handlers()
 slack_handler = SlackRequestHandler(app)
+
+# Load fallback fun facts from JSON file
+def load_fallback_fun_facts() -> list:
+    """Load predefined fun facts from JSON file."""
+    try:
+        facts_path = os.path.join(os.path.dirname(__file__), 'fun_facts.json')
+        with open(facts_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading fun_facts.json: {e}")
+        return ["Participants report coffee tastes 87% better when shared with a colleague you've never met."]
+
+
+def get_random_fallback_fact() -> str:
+    """Get a random fun fact from the predefined list."""
+    facts = load_fallback_fun_facts()
+    return random.choice(facts)
+
+
+def generate_fun_fact(date: datetime.date) -> str:
+    """Generate a fun fact about the given date using Claude API."""
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        print("ANTHROPIC_API_KEY not set, using random fallback fun fact")
+        return get_random_fallback_fact()
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        date_str = date.strftime("%B %d")
+
+        response = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=150,
+            messages=[{
+                "role": "user",
+                "content": f"Give me one brief, interesting historical fact about something that happened on {date_str} (any year). Keep it fun and suitable for a workplace coffee chat signup message. One or two sentences max. Don't include the year in your response - just the fact itself."
+            }]
+        )
+
+        fun_fact = response.content[0].text.strip()
+        print(f"Generated fun fact: {fun_fact}")
+        return fun_fact
+
+    except Exception as e:
+        print(f"Error generating fun fact: {e}")
+        return get_random_fallback_fact()
 
 
 class CoffeePairingBot:
@@ -577,7 +624,10 @@ def post_signup_message_internal():
                 return f"Signup message already posted today ({today})"
         except s3.exceptions.NoSuchKey:
             pass
-        
+
+        # Generate a fun fact for today's date
+        fun_fact = generate_fun_fact(today)
+
         # Post the signup message (backend accepts any emoji)
         result = app.client.chat_postMessage(
             channel=channel,
@@ -587,7 +637,7 @@ def post_signup_message_internal():
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "☕ *Coffee Chat Signups - React to Join!*\n\nQuick coffee chats with random colleagues. 15-20 minutes. You pick when.\n\nFun fact: Participants report coffee tastes 87% better when shared with a colleague you've never met.\n\nReact with any emoji by Wednesday noon to be paired!"
+                        "text": f"☕ *Coffee Chat Signups - React to Join!*\n\nQuick coffee chats with random colleagues. 15-20 minutes. You pick when.\n\nFun fact: {fun_fact}\n\nReact with any emoji by Wednesday noon to be paired!"
                     }
                 }
             ]
