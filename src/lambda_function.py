@@ -212,10 +212,22 @@ class CoffeePairingBot:
         # Handle odd number of participants
         single_person = None
         if len(participants) % 2 != 0:
-            # Find someone who has been single least recently or never
-            single_candidates = participants.copy()
-            single_candidates.sort(key=self.get_last_single_date)
-            single_person = single_candidates[0]
+            # Prefer experienced participants (4+ participations) to be single
+            # Protects newcomers (≤3 participations) from being selected
+            experienced = [p for p in participants
+                           if p in self.history["badges"]
+                           and self.history["badges"][p]["total_participations"] >= 4]
+
+            if experienced:
+                # Among experienced participants, pick who was single least recently
+                experienced.sort(key=self.get_last_single_date)
+                single_person = experienced[0]
+            else:
+                # Everyone is a newcomer - fall back to least recently single
+                single_candidates = participants.copy()
+                single_candidates.sort(key=self.get_last_single_date)
+                single_person = single_candidates[0]
+
             participants.remove(single_person)
 
         # Identify newcomers (3 or fewer participations) and veterans (8+ participations)
