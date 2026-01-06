@@ -332,9 +332,10 @@ class CoffeePairingBot:
                 print(f"Selected pair: {best_pair[0]} + {best_pair[1]} (score: {best_score})")
             else:
                 # Fallback - should not happen with scoring system, but safety net
-                pairs.append([unpaired[0], unpaired[1]])
-                unpaired.remove(unpaired[0])
-                unpaired.remove(unpaired[0])
+                p1, p2 = unpaired[0], unpaired[1]
+                pairs.append([p1, p2])
+                unpaired.remove(p1)
+                unpaired.remove(p2)
                 print(f"Fallback pairing used")
 
         # Save this week's pairings to history
